@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyAI — LeadNest Dev</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@300;400;600&display=swap');
+  :root {
+    --bg:#0e0e10;--surface:#17171a;--border:#2a2a2f;--accent:#f0a500;--accent2:#e05a00;
+    --green:#3dd68c;--red:#ff5f5f;--blue:#5b9cf6;--text:#e8e3d8;--muted:#6b6760;
+    --user-bg:#1e1c18;--ai-bg:#141416;--code-bg:#0a0a0c;--radius:10px;
+    --font-ui:'Sora',sans-serif;--font-code:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:14px;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+  #topbar{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;flex-wrap:wrap;}
+  #topbar .brand{font-family:var(--font-code);font-weight:700;font-size:14px;color:var(--accent);margin-right:4px;}
+  .model-btn{padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:var(--font-code);font-size:11px;cursor:pointer;transition:all .15s;}
+  .model-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;}
+  .model-btn:hover:not(.active){border-color:var(--accent);color:var(--accent);}
+  .sep{width:1px;height:20px;background:var(--border);margin:0 2px;}
+  .top-btn{padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:var(--font-code);font-size:11px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;}
+  .top-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .top-btn.green:hover{border-color:var(--green);color:var(--green);}
+  .top-btn.blue:hover{border-color:var(--blue);color:var(--blue);}
+  #token-display{font-family:var(--font-code);font-size:10px;color:var(--muted);}
+  #cost-display{font-family:var(--font-code);font-size:10px;color:var(--green);}
+  #clear-btn{margin-left:auto;padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:var(--font-ui);font-size:11px;cursor:pointer;transition:all .15s;}
+  #clear-btn:hover{border-color:var(--red);color:var(--red);}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+  .modal h2{font-family:var(--font-code);font-size:14px;color:var(--accent);margin-bottom:16px;}
+  .modal label{display:block;font-size:11px;color:var(--muted);font-family:var(--font-code);margin-bottom:5px;margin-top:12px;}
+  .modal input,.modal textarea,.modal select{width:100%;background:var(--code-bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--font-code);font-size:12px;}
+  .modal input:focus,.modal textarea:focus{outline:none;border-color:var(--accent);}
+  .modal textarea{resize:vertical;min-height:60px;}
+  .modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end;}
+  .btn-primary{padding:8px 20px;background:var(--accent);color:#000;border:none;border-radius:8px;font-family:var(--font-code);font-size:12px;font-weight:700;cursor:pointer;}
+  .btn-primary:hover{background:#ffbb20;}
+  .btn-primary.green{background:var(--green);}
+  .btn-primary.green:hover{background:#5aeea8;}
+  .btn-primary.blue{background:var(--blue);}
+  .btn-cancel{padding:8px 16px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;font-family:var(--font-code);font-size:12px;cursor:pointer;}
+  .btn-cancel:hover{color:var(--text);border-color:var(--text);}
+  .status-msg{margin-top:12px;padding:8px 12px;border-radius:7px;font-family:var(--font-code);font-size:12px;display:none;}
+  .status-msg.ok{background:#0e2e1e;border:1px solid #1a5a3a;color:var(--green);display:block;}
+  .status-msg.err{background:#2e0e0e;border:1px solid #5a1a1a;color:var(--red);display:block;}
+  .status-msg.info{background:#0e1e2e;border:1px solid #1a3a5a;color:var(--blue);display:block;}
+  #chat{flex:1;overflow-y:auto;padding:20px 0;scroll-behavior:smooth;}
+  #chat::-webkit-scrollbar{width:4px;}
+  #chat::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+  .msg-wrap{padding:5px 16px;animation:fadeIn .2s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .msg{max-width:860px;margin:0 auto;display:flex;gap:10px;align-items:flex-start;}
+  .msg-wrap.user .msg{flex-direction:row-reverse;}
+  .avatar{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-code);font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px;}
+  .user .avatar{background:var(--accent);color:#000;}
+  .ai .avatar{background:#222;color:var(--accent);border:1px solid var(--border);}
+  .sys .avatar{background:#1a2a1a;color:var(--green);border:1px solid #2a4a2a;font-size:14px;}
+  .bubble{padding:10px 14px;border-radius:var(--radius);line-height:1.65;max-width:calc(100% - 40px);word-break:break-word;}
+  .user .bubble{background:var(--user-bg);border:1px solid #2e2b22;border-radius:var(--radius) 2px var(--radius) var(--radius);}
+  .ai .bubble{background:var(--ai-bg);border:1px solid var(--border);border-radius:2px var(--radius) var(--radius) var(--radius);}
+  .sys .bubble{background:#0e1e0e;border:1px solid #1e3e1e;border-radius:var(--radius);font-family:var(--font-code);font-size:12px;color:var(--green);}
+  .bubble pre{background:var(--code-bg);border:1px solid #222;border-radius:7px;margin:10px 0;overflow:auto;position:relative;}
+  .bubble pre code{display:block;padding:14px 16px;font-family:var(--font-code);font-size:12px;line-height:1.7;color:#ccc;overflow-x:auto;}
+  .pre-header{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-bottom:1px solid #1a1a1e;background:#0d0d10;}
+  .pre-lang{font-family:var(--font-code);font-size:10px;color:var(--muted);}
+  .pre-actions{display:flex;gap:6px;}
+  .copy-btn,.push-file-btn{padding:2px 9px;font-size:10px;font-family:var(--font-code);background:#1e1e22;border:1px solid #333;color:var(--muted);border-radius:5px;cursor:pointer;transition:all .15s;}
+  .copy-btn:hover{background:var(--accent);color:#000;border-color:var(--accent);}
+  .push-file-btn:hover{background:var(--green);color:#000;border-color:var(--green);}
+  .copy-btn.copied{background:#1a3a1a;color:#5f5;border-color:#2a4a2a;}
+  .bubble code:not(pre code){font-family:var(--font-code);font-size:12px;background:#1a1a1e;border:1px solid #2a2a30;padding:1px 5px;border-radius:4px;color:var(--accent);}
+  .bubble p{margin:6px 0;}.bubble ul,.bubble ol{padding-left:20px;margin:6px 0;}.bubble li{margin:3px 0;}
+  .bubble strong{color:#fff;font-weight:600;}
+  .bubble h1,.bubble h2,.bubble h3{font-family:var(--font-code);color:var(--accent);margin:12px 0 6px;font-size:14px;}
+  .bubble hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
+  .thinking{display:flex;gap:4px;align-items:center;padding:4px 0;}
+  .thinking span{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 1.2s infinite;}
+  .thinking span:nth-child(2){animation-delay:.2s;}.thinking span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+  #context-bar{border-top:1px solid var(--border);background:var(--surface);padding:8px 16px;display:flex;align-items:flex-start;gap:10px;flex-shrink:0;}
+  #context-label{font-family:var(--font-code);font-size:10px;color:var(--muted);padding-top:8px;white-space:nowrap;}
+  #context-input{flex:1;background:var(--code-bg);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-family:var(--font-code);font-size:11.5px;color:var(--text);resize:none;height:56px;transition:border-color .15s;line-height:1.5;}
+  #context-input:focus{outline:none;border-color:var(--accent);}
+  #context-input::placeholder{color:var(--muted);}
+  .ctx-btn{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-top:6px;transition:all .15s;font-family:var(--font-code);white-space:nowrap;}
+  .ctx-btn:hover{border-color:var(--accent);color:var(--accent);}
+  #inputbar{border-top:1px solid var(--border);background:var(--surface);padding:10px 16px;flex-shrink:0;}
+  #input-row{display:flex;gap:10px;max-width:860px;margin:0 auto;align-items:flex-end;}
+  #user-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-family:var(--font-ui);font-size:14px;color:var(--text);resize:none;min-height:44px;max-height:160px;line-height:1.5;transition:border-color .15s;}
+  #user-input:focus{outline:none;border-color:var(--accent);}
+  #user-input::placeholder{color:var(--muted);}
+  #send-btn{width:44px;height:44px;border-radius:10px;border:none;background:var(--accent);color:#000;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,transform .1s;}
+  #send-btn:hover{background:#ffbb20;}#send-btn:active{transform:scale(.95);}
+  #send-btn:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;}
+  #hint{text-align:center;font-size:10px;color:var(--muted);margin-top:5px;font-family:var(--font-code);}
+  #welcome{max-width:560px;margin:50px auto;text-align:center;padding:0 20px;}
+  #welcome h1{font-family:var(--font-code);font-size:24px;color:var(--accent);margin-bottom:6px;}
+  #welcome .sub{color:var(--muted);font-size:12px;margin-bottom:20px;}
+  #welcome .pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+  #welcome .pill{padding:5px 14px;border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--muted);font-family:var(--font-code);cursor:pointer;transition:all .15s;}
+  #welcome .pill:hover{border-color:var(--accent);color:var(--accent);}
+  #file-input{display:none;}
+
+  
+/* ── CONTEXT TABS ── */
+let tabs = [{ name: 'context 1', content: '' }];
+let activeTab = 0;
+
+function switchTab(idx) {
+  // save current content
+  tabs[activeTab].content = document.getElementById('context-input').value;
+  activeTab = idx;
+  document.getElementById('context-input').value = tabs[idx].content;
+  document.querySelectorAll('.ctx-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+}
+
+function addTab() {
+  tabs[activeTab].content = document.getElementById('context-input').value;
+  const idx = tabs.length;
+  tabs.push({ name: `context ${idx+1}`, content: '' });
+  const tabsEl = document.getElementById('context-tabs');
+  const addBtn = tabsEl.querySelector('.ctx-tab-add');
+  const btn = document.createElement('button');
+  btn.className = 'ctx-tab';
+  btn.id = `tab-${idx}`;
+  btn.innerHTML = `<span class="tab-name">context ${idx+1}</span><span class="tab-close" onclick="closeTab(event,${idx})">✕</span>`;
+  btn.onclick = () => switchTab(idx);
+  tabsEl.insertBefore(btn, addBtn);
+  switchTab(idx);
+}
+
+function closeTab(e, idx) {
+  e.stopPropagation();
+  if (tabs.length === 1) { tabs[0].content=''; document.getElementById('context-input').value=''; return; }
+  tabs.splice(idx, 1);
+  // re-render tabs
+  const tabsEl = document.getElementById('context-tabs');
+  const addBtn = tabsEl.querySelector('.ctx-tab-add');
+  tabsEl.querySelectorAll('.ctx-tab').forEach(t => t.remove());
+  tabs.forEach((tab, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'ctx-tab' + (i===0?' active':'');
+    btn.id = `tab-${i}`;
+    btn.innerHTML = `<span class="tab-name">${tab.name}</span><span class="tab-close" onclick="closeTab(event,${i})">✕</span>`;
+    btn.onclick = () => switchTab(i);
+    tabsEl.insertBefore(btn, addBtn);
+  });
+  activeTab = 0;
+  document.getElementById('context-input').value = tabs[0].content;
+}
+
+function getActiveContext() {
+  tabs[activeTab].content = document.getElementById('context-input').value;
+  // combine ALL non-empty tabs into context
+  return tabs.filter(t => t.content.trim()).map(t => t.content).join('\n\n// ════════════════\n\n');
+}
+
+// Override loadFileContent to load into active tab and name the tab
+const _origLoadFile = loadFileContent;
+async function loadFileContent(path, el) {
+  const { token, owner, repo, branch } = CONFIG.github;
+  document.querySelectorAll('.tree-item.active').forEach(e=>e.classList.remove('active'));
+  el?.classList.add('active');
+  if (el) el.querySelector('span:last-child').textContent += ' ⏳';
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`, {
+      headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+    const fileName = path.split('/').pop();
+    tabs[activeTab].name = fileName;
+    tabs[activeTab].content = `// FILE: ${path}\n${content}`;
+    document.getElementById(`tab-${activeTab}`).querySelector('.tab-name').textContent = fileName;
+    document.getElementById('context-input').value = tabs[activeTab].content;
+    if (el) el.querySelector('span:last-child').textContent = el.querySelector('span:last-child').textContent.replace(' ⏳','');
+    appendMsg('sys', `✓ Loaded: \`${path}\` into context tab "${fileName}"`);
+  } catch(e) {
+    if (el) el.querySelector('span:last-child').textContent = el.querySelector('span:last-child').textContent.replace(' ⏳','');
+    appendMsg('sys', `✗ Could not load ${path}: ${e.message}`);
+  }
+}
+
+/* ── .myai CONFIG FILE ── */
+async function loadMyAIConfig() {
+  const { token, owner, repo, branch } = CONFIG.github;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/.myai?ref=${branch}`, {
+      headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) {
+      appendMsg('sys', `No .myai config found in repo root. Creating template...`);
+      await createMyAIConfig();
+      return;
+    }
+    const data = await res.json();
+    const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+    // inject into system prompt for this session
+    CONFIG._sessionSystem = CONFIG.systemPrompt + '\n\n# PROJECT CONFIG (.myai)\n' + content;
+    appendMsg('sys', `✓ .myai config loaded — AI now knows your project context for this session`);
+  } catch(e) {
+    appendMsg('sys', `✗ Failed to load .myai: ${e.message}`);
+  }
+}
+
+async function createMyAIConfig() {
+  const template = `# LeadNest — MyAI Project Config
+# This file is auto-loaded by MyAI to give the AI context about your project
+
+project: LeadNest
+description: CRM and lead management application
+stack:
+  frontend: Next.js, TypeScript, Tailwind CSS
+  backend: Next.js API routes
+  database: Supabase (PostgreSQL)
+  auth: Supabase Auth
+  deployment: Google Cloud Run
+  registry: gcr.io/gen-lang-client-0794202345/leadnest
+
+repo: https://github.com/shantanunitinkulkaarni-ts/claude-leadnest
+branch: main
+
+conventions:
+  - Use TypeScript strictly
+  - Components go in /components
+  - API routes go in /app/api
+  - Keep files under 200 lines
+  - Use Tailwind for styling
+
+current_focus:
+  - Write what you are currently working on here
+
+env_vars:
+  - NEXT_PUBLIC_SUPABASE_URL
+  - NEXT_PUBLIC_SUPABASE_ANON_KEY
+  - ANTHROPIC_API_KEY
+
+notes:
+  - Add any notes for the AI here
+`;
+  const { token, owner, repo, branch } = CONFIG.github;
+  const body = {
+    message: 'chore: add .myai project config',
+    content: btoa(unescape(encodeURIComponent(template))),
+    branch
+  };
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/.myai`, {
+    method: 'PUT',
+    headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github.v3+json' },
+    body: JSON.stringify(body)
+  });
+  if (res.ok) {
+    appendMsg('sys', `✓ Created .myai in repo root — edit it with your project details, then click ⚙ .myai again to load`);
+  } else {
+    appendMsg('sys', `✗ Could not create .myai file`);
+  }
+}
+
+// Auto-load .myai on startup
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(loadMyAIConfig, 2000); // after file tree loads
+});
+
+/* ── CONTEXT TABS ── */
+  #context-tabs{display:flex;gap:4px;padding:6px 16px 0;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;overflow-x:auto;}
+  #context-tabs::-webkit-scrollbar{height:3px;}
+  #context-tabs::-webkit-scrollbar-thumb{background:var(--border);}
+  .ctx-tab{padding:3px 10px;border-radius:6px 6px 0 0;border:1px solid var(--border);border-bottom:none;background:transparent;color:var(--muted);font-family:var(--font-code);font-size:11px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;transition:all .15s;}
+  .ctx-tab.active{background:var(--code-bg);color:var(--text);border-color:var(--border);}
+  .ctx-tab:hover:not(.active){color:var(--accent);}
+  .ctx-tab .tab-close{opacity:0.4;font-size:10px;margin-left:2px;}
+  .ctx-tab .tab-close:hover{opacity:1;color:var(--red);}
+  .ctx-tab-add{padding:3px 8px;border-radius:6px 6px 0 0;border:1px solid transparent;background:transparent;color:var(--muted);font-family:var(--font-code);font-size:14px;cursor:pointer;}
+  .ctx-tab-add:hover{color:var(--accent);}
+
+
+  /* ── SIDEBAR ── */
+  #app-wrap{display:flex;flex:1;overflow:hidden;}
+  #sidebar{width:220px;min-width:220px;background:#111113;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .2s;}
+  #sidebar.collapsed{width:0;min-width:0;}
+  #sidebar-header{padding:8px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  #sidebar-header span{font-family:var(--font-code);font-size:11px;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;}
+  #sidebar-refresh{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 4px;}
+  #sidebar-refresh:hover{color:var(--accent);}
+  #file-tree{flex:1;overflow-y:auto;padding:4px 0;}
+  #file-tree::-webkit-scrollbar{width:3px;}
+  #file-tree::-webkit-scrollbar-thumb{background:var(--border);}
+  .tree-item{display:flex;align-items:center;gap:6px;padding:4px 10px;cursor:pointer;font-family:var(--font-code);font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .1s;}
+  .tree-item:hover{background:#1a1a1e;color:var(--text);}
+  .tree-item.folder{color:#888;}
+  .tree-item.active{background:#1e1c14;color:var(--accent);}
+  .tree-item .icon{flex-shrink:0;}
+  .tree-children{padding-left:12px;}
+  #sidebar-toggle{padding:4px 8px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:var(--font-code);font-size:11px;cursor:pointer;transition:all .15s;}
+  #sidebar-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  #main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+</style>
+</head>
+<body>
+
+<script>
+const CONFIG = {
+  apiKey:  window.__ENV?.API_KEY || "",
+  baseUrl: window.__ENV?.API_BASE_URL || "/v1",
+  models: {
+    haiku:  "claude-haiku-4-5",
+    sonnet: "claude-sonnet-4-5",
+    qwen:   "qwen/qwen3-coder-30b-a3b-instruct"
+  },
+  systemPrompt: `You are a senior full-stack engineer working on LeadNest — a lead management and CRM application deployed on Google Cloud Run. You help build features, fix bugs, refactor code, write tests, and plan deployments. Always write production-quality code. Use code blocks with correct language tags. When asked to modify files, show the complete updated file content. Be concise. Prefer working code over long explanations.`,
+  github: {
+    token:  window.__ENV?.GITHUB_TOKEN || "",
+    owner:  "shantanunitinkulkaarni-ts",
+    repo:   "myai",
+    branch: "main"
+  },
+  gcp: {
+    project:  window.__ENV?.GCP_PROJECT || "gen-lang-client-0794202345",
+    service:  "leadnest",
+    region:   "asia-south1",
+    registry: "gcr.io"
+  }
+};
+</script>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <span class="brand">⚡ MyAI</span>
+  <button class="model-btn active" id="btn-haiku"  onclick="setModel('haiku')">Haiku</button>
+  <button class="model-btn"        id="btn-sonnet" onclick="setModel('sonnet')">Sonnet</button>
+  <button class="model-btn"        id="btn-qwen"   onclick="setModel('qwen')">Qwen3</button>
+  <div class="sep"></div>
+  <button class="top-btn green" onclick="openGitModal()">⬆ Git Push</button>
+  <button class="top-btn blue"  onclick="openDeployModal()">🚀 Deploy GCP</button>
+  <button class="top-btn"       onclick="openHandoffModal()">📋 Handoff</button>
+  <div class="sep"></div>
+  <span id="token-display">tokens: 0</span>
+  <span id="cost-display">&nbsp;~$0.0000</span>
+  <button class="top-btn" onclick="resetTokens()" title="Reset token counter">↺</button>
+  <button id="sidebar-toggle" onclick="toggleSidebar()">◀ files</button>
+  <button id="clear-btn" onclick="clearChat()">New Chat</button>
+</div>
+
+<!-- SIDEBAR + MAIN -->
+<div id="app-wrap">
+<div id="sidebar">
+  <div id="sidebar-header">
+    <span id="sidebar-repo-label">📁 loading...</span>
+    <button id="sidebar-refresh" onclick="loadFileTree()" title="Refresh">↻</button>
+    <button onclick="loadMyAIConfig()" title="Load .myai config" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:2px 7px;font-family:var(--font-code);font-size:10px;cursor:pointer;" onmouseover="this.style.color='var(--green)';this.style.borderColor='var(--green)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">⚙ .myai</button>
+    <button id="sidebar-load-all" onclick="loadFolder('')" title="Load entire repo into context" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:2px 7px;font-family:var(--font-code);font-size:10px;cursor:pointer;" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">⬇ all</button>
+  </div>
+  <div id="file-tree"><div style="padding:10px;font-family:var(--font-code);font-size:11px;color:var(--muted)">Loading repo...</div></div>
+</div>
+<div id="main-area">
+<!-- CHAT -->
+<div id="chat">
+  <div id="welcome">
+    <h1>⚡ MyAI — LeadNest</h1>
+    <p class="sub">aicredits.in · Haiku · Sonnet · Qwen3 Coder · No limits, just your credits</p>
+    <div class="pills">
+      <div class="pill" onclick="quickPrompt('Add a new feature to LeadNest: ')">Add feature</div>
+      <div class="pill" onclick="quickPrompt('Fix this bug: ')">Fix bug</div>
+      <div class="pill" onclick="quickPrompt('Write unit tests for the code in context')">Write tests</div>
+      <div class="pill" onclick="quickPrompt('Refactor the code in context for production quality')">Refactor</div>
+      <div class="pill" onclick="quickPrompt('Review this code and suggest improvements')">Code review</div>
+      <div class="pill" onclick="quickPrompt('Write a Dockerfile for LeadNest optimised for Cloud Run')">Dockerfile</div>
+      <div class="pill" onclick="quickPrompt('Create a new API endpoint for: ')">New endpoint</div>
+      <div class="pill" onclick="quickPrompt('Debug this error: ')">Debug error</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTEXT TABS -->
+<div id="context-tabs">
+  <button class="ctx-tab active" id="tab-0" onclick="switchTab(0)"><span class="tab-name">context 1</span><span class="tab-close" onclick="closeTab(event,0)">✕</span></button>
+  <button class="ctx-tab-add" onclick="addTab()" title="Add context tab">+</button>
+</div>
+<!-- CONTEXT PANEL -->
+<div id="context-bar">
+  <span id="context-label">context<br/>/ code</span>
+  <textarea id="context-input" placeholder="Paste file content here — sent as context with every message. Or use 📂 to load a file."></textarea>
+  <button class="ctx-btn" onclick="document.getElementById('file-input').click()">📂 file</button>
+  <button class="ctx-btn" onclick="document.getElementById('context-input').value=''">✕ clear</button>
+  <input type="file" id="file-input" onchange="loadFile(event)">
+</div>
+
+<!-- INPUT BAR -->
+<div id="inputbar">
+  <div id="input-row">
+    <textarea id="user-input" placeholder="Describe a feature, paste an error, ask anything..." rows="1"
+      onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <button id="send-btn" onclick="sendMessage()">↑</button>
+  </div>
+  <div id="hint">Enter = send &nbsp;·&nbsp; Shift+Enter = newline &nbsp;·&nbsp; Haiku = fast &nbsp;·&nbsp; Sonnet = powerful</div>
+</div><!-- /main-area -->
+</div><!-- /app-wrap -->
+
+<!-- GIT MODAL -->
+<div class="modal-overlay" id="git-modal">
+  <div class="modal">
+    <h2>⬆ Push to GitHub</h2>
+    <label>Repository</label>
+    <input id="git-repo-display" readonly style="color:var(--muted)">
+    <label>Branch</label>
+    <input id="git-branch">
+    <label>File path in repo (e.g. src/components/LeadCard.jsx)</label>
+    <input id="git-filepath" placeholder="src/...">
+    <label>File content</label>
+    <textarea id="git-content" style="min-height:100px;font-size:11px" placeholder="Auto-filled from last code block, or paste here"></textarea>
+    <label>Commit message</label>
+    <input id="git-commitmsg" placeholder="feat: add lead scoring">
+    <div id="git-status" class="status-msg"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('git-modal')">Cancel</button>
+      <button class="btn-primary green" onclick="doPush()">⬆ Push</button>
+    </div>
+  </div>
+</div>
+
+<!-- DEPLOY MODAL -->
+<div class="modal-overlay" id="deploy-modal">
+  <div class="modal">
+    <h2>🚀 Deploy to Cloud Run</h2>
+
+    <label>Image tag</label>
+    <input id="dep-tag" placeholder="latest" oninput="buildDeployCmd()">
+
+    <label style="margin-top:16px;font-size:12px;color:var(--text)">① Build &amp; push image</label>
+    <div style="position:relative;margin-top:6px">
+      <textarea id="dep-cmd-build" readonly style="min-height:56px;font-size:11px;background:#0a0a0c;color:#aaa;border:1px solid var(--border);border-radius:7px;padding:10px;width:100%;resize:none;font-family:var(--font-code)"></textarea>
+      <button class="copy-btn" style="position:absolute;top:8px;right:8px" onclick="copyField('dep-cmd-build',this)">copy</button>
+    </div>
+
+    <label style="margin-top:14px;font-size:12px;color:var(--text)">② Deploy to Cloud Run</label>
+    <div style="position:relative;margin-top:6px">
+      <textarea id="dep-cmd-deploy" readonly style="min-height:100px;font-size:11px;background:#0a0a0c;color:#aaa;border:1px solid var(--border);border-radius:7px;padding:10px;width:100%;resize:none;font-family:var(--font-code)"></textarea>
+      <button class="copy-btn" style="position:absolute;top:8px;right:8px" onclick="copyField('dep-cmd-deploy',this)">copy</button>
+    </div>
+
+    <label style="margin-top:14px;font-size:12px;color:var(--text)">③ Or do both in one shot</label>
+    <div style="position:relative;margin-top:6px">
+      <textarea id="dep-cmd-all" readonly style="min-height:130px;font-size:11px;background:#0a0a0c;color:#aaa;border:1px solid var(--border);border-radius:7px;padding:10px;width:100%;resize:none;font-family:var(--font-code)"></textarea>
+      <button class="copy-btn" style="position:absolute;top:8px;right:8px" onclick="copyField('dep-cmd-all',this)">copy</button>
+    </div>
+
+    <div style="margin-top:12px;padding:8px 12px;border-radius:7px;background:#0e1e2e;border:1px solid #1a3a5a;font-family:var(--font-code);font-size:11px;color:var(--blue)">
+      ⓘ Copy any command above and paste directly into your terminal. No edits needed.
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('deploy-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- HANDOFF MODAL REMOVED - auto generates -->
+
+<script>
+let history   = JSON.parse(localStorage.getItem('myai_history')||'[]');
+let model     = localStorage.getItem('myai_model')||'haiku';
+let totalToks = parseFloat(localStorage.getItem('myai_toks')||'0');
+let totalCost = parseFloat(localStorage.getItem('myai_cost')||'0');
+let streaming = false;
+let cbIdx     = 0;
+
+function saveState() {
+  try {
+    localStorage.setItem('myai_history', JSON.stringify(history));
+    localStorage.setItem('myai_model', model);
+    localStorage.setItem('myai_toks', totalToks);
+    localStorage.setItem('myai_cost', totalCost);
+  } catch(e) {
+    // localStorage full — trim oldest 10 messages and retry
+    if (history.length > 10) {
+      history = history.slice(-40);
+      try { localStorage.setItem('myai_history', JSON.stringify(history)); } catch(e2) {}
+    }
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  // restore model
+  setModel(model);
+  document.getElementById('token-display').textContent = `tokens: ${totalToks.toLocaleString()}`;
+  document.getElementById('cost-display').textContent  = `~$${totalCost.toFixed(4)}`;
+  // restore chat UI from history
+  if (history.length) {
+    document.getElementById('welcome')?.remove();
+    history.forEach(msg => {
+      if (msg.role === 'user') {
+        // show clean version (strip context_code wrapper)
+        const display = msg.content.replace(/<context_code>[\s\S]*?<\/context_code>\n\n/, '');
+        appendMsg('user', display);
+      } else if (msg.role === 'assistant') {
+        appendMsg('ai', msg.content);
+      }
+    });
+  }
+});
+
+const COST = {
+  haiku:  { in: 0.0008, out: 0.004  },
+  sonnet: { in: 0.003,  out: 0.015  },
+  qwen:   { in: 0.00007, out: 0.00027 }
+};
+
+function resetTokens() {
+  if (!confirm('Reset token counter to zero?')) return;
+  totalToks=0; totalCost=0;
+  localStorage.setItem('myai_toks','0');
+  localStorage.setItem('myai_cost','0');
+  document.getElementById('token-display').textContent='tokens: 0';
+  document.getElementById('cost-display').textContent='~$0.0000';
+}
+
+function setModel(m) {
+  model = m;
+  document.getElementById('btn-haiku').classList.toggle('active',  m==='haiku');
+  document.getElementById('btn-sonnet').classList.toggle('active', m==='sonnet');
+  document.getElementById('btn-qwen').classList.toggle('active',   m==='qwen');
+  localStorage.setItem('myai_model', m);
+}
+
+function clearChat() {
+  if (history.length && !confirm('Clear chat and start fresh?')) return;
+  history=[]; cbIdx=0;
+  localStorage.removeItem('myai_history');
+  renderWelcome();
+}
+
+function renderWelcome() {
+  document.getElementById('chat').innerHTML = `
+    <div id="welcome">
+      <h1>⚡ MyAI — LeadNest</h1>
+      <p class="sub">aicredits.in · Haiku · Sonnet · Qwen3 Coder · No limits, just your credits</p>
+      <div class="pills">
+        <div class="pill" onclick="quickPrompt('Add a new feature to LeadNest: ')">Add feature</div>
+        <div class="pill" onclick="quickPrompt('Fix this bug: ')">Fix bug</div>
+        <div class="pill" onclick="quickPrompt('Write unit tests for the code in context')">Write tests</div>
+        <div class="pill" onclick="quickPrompt('Refactor the code in context for production quality')">Refactor</div>
+        <div class="pill" onclick="quickPrompt('Review this code and suggest improvements')">Code review</div>
+        <div class="pill" onclick="quickPrompt('Write a Dockerfile for LeadNest optimised for Cloud Run')">Dockerfile</div>
+        <div class="pill" onclick="quickPrompt('Create a new API endpoint for: ')">New endpoint</div>
+        <div class="pill" onclick="quickPrompt('Debug this error: ')">Debug error</div>
+      </div>
+    </div>`;
+}
+
+function loadFile(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('context-input').value = `// FILE: ${file.name}\n${ev.target.result}`;
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function quickPrompt(t) {
+  document.getElementById('user-input').value = t;
+  document.getElementById('user-input').focus();
+}
+
+function autoResize(el) {
+  el.style.height='auto';
+  el.style.height=Math.min(el.scrollHeight,160)+'px';
+}
+
+function handleKey(e) {
+  if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderContent(text) {
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_,lang,code) => {
+    const id = 'cb'+(++cbIdx);
+    const escaped = code.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const l = lang||'code';
+    return `<pre id="${id}"><div class="pre-header"><span class="pre-lang">${l}</span><div class="pre-actions"><button class="push-file-btn" onclick="prefillPush('${id}','${l}')">⬆ push</button><button class="copy-btn" onclick="copyCode('${id}',this)">copy</button></div></div><code>${escaped}</code></pre>`;
+  });
+  text = text.replace(/`([^`]+)`/g,'<code>$1</code>');
+  text = text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  text = text.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+  text = text.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+  text = text.replace(/^# (.+)$/gm,'<h1>$1</h1>');
+  text = text.replace(/^---$/gm,'<hr>');
+  text = text.replace(/^[\*\-] (.+)$/gm,'<li>$1</li>');
+  text = text.replace(/(<li>.*<\/li>\n?)+/g,s=>`<ul>${s}</ul>`);
+  text = text.replace(/\n\n/g,'</p><p>');
+  text = text.replace(/\n/g,'<br>');
+  return `<p>${text}</p>`;
+}
+
+function copyCode(preId, btn) {
+  const code = document.getElementById(preId).querySelector('code').innerText;
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent='copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='copy'; btn.classList.remove('copied'); },2000);
+  });
+}
+
+function copyField(id, btn) {
+  const val = document.getElementById(id).value;
+  navigator.clipboard.writeText(val).then(() => {
+    btn.textContent='copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='copy'; btn.classList.remove('copied'); },2000);
+  });
+}
+
+function appendMsg(role, content) {
+  document.getElementById('welcome')?.remove();
+  const chat = document.getElementById('chat');
+  const wrap = document.createElement('div');
+  wrap.className = `msg-wrap ${role}`;
+  const lbl = { user:'YOU', ai:'AI', sys:'✓' }[role]||role;
+  wrap.innerHTML = `<div class="msg"><div class="avatar">${lbl}</div><div class="bubble">${role==='user'?escHtml(content):renderContent(content)}</div></div>`;
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function appendThinking() {
+  document.getElementById('welcome')?.remove();
+  const chat = document.getElementById('chat');
+  const wrap = document.createElement('div');
+  wrap.id='thinking'; wrap.className='msg-wrap ai';
+  wrap.innerHTML=`<div class="msg"><div class="avatar">AI</div><div class="bubble"><div class="thinking"><span></span><span></span><span></span></div></div></div>`;
+  chat.appendChild(wrap);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+async function sendMessage() {
+  if (streaming) return;
+  const input = document.getElementById('user-input');
+  tabs[activeTab].content = document.getElementById('context-input').value;
+  const ctx   = getActiveContext().trim();
+  const text  = input.value.trim();
+  if (!text) return;
+
+  let userContent = ctx ? `<context_code>\n${ctx}\n</context_code>\n\n${text}` : text;
+  input.value=''; input.style.height='auto';
+  appendMsg('user', text);
+  history.push({ role:'user', content:userContent });
+  saveState();
+  streaming=true;
+  document.getElementById('send-btn').disabled=true;
+  appendThinking();
+
+  try {
+    const isClaudeModel = CONFIG.models[model].startsWith('claude-');
+    let res, data, reply;
+
+    if (isClaudeModel) {
+      // Anthropic format
+      res = await fetch(`${CONFIG.baseUrl}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':'application/json',
+          'Authorization': `Bearer ${CONFIG.apiKey}`,
+          'x-api-key': CONFIG.apiKey,
+          'anthropic-version':'2023-06-01'
+        },
+        body: JSON.stringify({
+          model: CONFIG.models[model],
+          max_tokens: 8192,
+          system: CONFIG.systemPrompt,
+          messages: history
+        })
+      });
+      if (!res.ok) { const err = await res.text(); throw new Error(`API ${res.status}: ${err}`); }
+      data  = await res.json();
+      reply = data.content?.[0]?.text || '(no response)';
+    } else {
+      // OpenAI-compatible format (Qwen, GPT, etc.)
+      const oaiMessages = [
+        { role: 'system', content: CONFIG.systemPrompt },
+        ...history
+      ];
+      res = await fetch(`${CONFIG.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':'application/json',
+          'Authorization': `Bearer ${CONFIG.apiKey}`
+        },
+        body: JSON.stringify({
+          model: CONFIG.models[model],
+          max_tokens: 8192,
+          messages: oaiMessages
+        })
+      });
+      if (!res.ok) { const err = await res.text(); throw new Error(`API ${res.status}: ${err}`); }
+      data  = await res.json();
+      reply = data.choices?.[0]?.message?.content || '(no response)';
+    }
+
+    if (data.usage) {
+      const u=data.usage, c=COST[model];
+      // Anthropic: input_tokens/output_tokens | OpenAI: prompt_tokens/completion_tokens
+      const inp = u.input_tokens  || u.prompt_tokens     || 0;
+      const out = u.output_tokens || u.completion_tokens || 0;
+      totalToks += inp + out;
+      totalCost += inp/1000*c.in + out/1000*c.out;
+      document.getElementById('token-display').textContent=`tokens: ${totalToks.toLocaleString()}`;
+      document.getElementById('cost-display').textContent=`~$${totalCost.toFixed(4)}`;
+      saveState();
+    }
+
+    document.getElementById('thinking')?.remove();
+    history.push({ role:'assistant', content:reply });
+  saveState();
+    appendMsg('ai', reply);
+
+  } catch(e) {
+    document.getElementById('thinking')?.remove();
+    appendMsg('ai', `**Error:** ${e.message}\n\nDouble-check CONFIG.apiKey and CONFIG.baseUrl at the top of this file.`);
+  }
+
+  streaming=false;
+  document.getElementById('send-btn').disabled=false;
+  document.getElementById('user-input').focus();
+}
+
+/* ── GIT ── */
+function openGitModal() {
+  document.getElementById('git-repo-display').value = `${CONFIG.github.owner}/${CONFIG.github.repo}`;
+  document.getElementById('git-branch').value = CONFIG.github.branch;
+  const blocks = document.querySelectorAll('#chat pre code');
+  if (blocks.length) document.getElementById('git-content').value = blocks[blocks.length-1].innerText;
+  setStatus('git-status','','');
+  openModal('git-modal');
+}
+
+function prefillPush(preId, lang) {
+  const code = document.getElementById(preId).querySelector('code').innerText;
+  const extMap={javascript:'js',typescript:'ts',python:'py',jsx:'jsx',tsx:'tsx',css:'css',html:'html',json:'json',yaml:'yml',dockerfile:'Dockerfile'};
+  const ext = extMap[lang.toLowerCase()]||lang;
+  document.getElementById('git-content').value = code;
+  document.getElementById('git-filepath').value = ext==='Dockerfile'?'Dockerfile':`src/file.${ext}`;
+  openGitModal();
+}
+
+async function doPush() {
+  const token   = CONFIG.github.token;
+  const owner   = CONFIG.github.owner;
+  const repo    = CONFIG.github.repo;
+  const branch  = document.getElementById('git-branch').value.trim();
+  const path    = document.getElementById('git-filepath').value.trim();
+  const content = document.getElementById('git-content').value;
+  const message = document.getElementById('git-commitmsg').value.trim() || 'chore: update via MyAI';
+
+  if (!path)    return setStatus('git-status','err','Enter a file path.');
+  if (!content) return setStatus('git-status','err','No content to push.');
+  if (token==='YOUR_GITHUB_PAT') return setStatus('git-status','err','Set CONFIG.github.token first.');
+
+  setStatus('git-status','info','Pushing…');
+  try {
+    const apiBase = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    const headers = { 'Authorization':`token ${token}`, 'Content-Type':'application/json', 'Accept':'application/vnd.github.v3+json' };
+    let sha = null;
+    const check = await fetch(`${apiBase}?ref=${branch}`, { headers });
+    if (check.ok) { const ex = await check.json(); sha = ex.sha; }
+    const body = { message, content: btoa(unescape(encodeURIComponent(content))), branch };
+    if (sha) body.sha = sha;
+    const res = await fetch(apiBase, { method:'PUT', headers, body:JSON.stringify(body) });
+    if (!res.ok) { const err=await res.json(); throw new Error(err.message||res.status); }
+    setStatus('git-status','ok',`✓ Pushed → ${owner}/${repo}/${path} [${branch}]`);
+    appendMsg('sys', `✓ Git push: \`${path}\` → ${owner}/${repo} [${branch}] — "${message}"`);
+  } catch(e) {
+    setStatus('git-status','err',`Failed: ${e.message}`);
+  }
+}
+
+/* ── DEPLOY ── */
+function openDeployModal() {
+  buildDeployCmd();
+  openModal('deploy-modal');
+}
+
+function buildDeployCmd() {
+  const project  = CONFIG.gcp.project;
+  const service  = CONFIG.gcp.service;
+  const region   = CONFIG.gcp.region;
+  const registry = CONFIG.gcp.registry;
+  const tag      = document.getElementById('dep-tag')?.value.trim() || 'latest';
+  const image    = `${registry}/${project}/${service}:${tag}`;
+
+  const buildCmd = `docker build -t ${image} .\ndocker push ${image}`;
+
+  const deployCmd = [
+    `gcloud run deploy ${service} \\`,
+    `  --image ${image} \\`,
+    `  --platform managed \\`,
+    `  --region ${region} \\`,
+    `  --project ${project} \\`,
+    `  --allow-unauthenticated`
+  ].join('\n');
+
+  const allCmd = `# Build & push\n${buildCmd}\n\n# Deploy\n${deployCmd}`;
+
+  const b = document.getElementById('dep-cmd-build');
+  const d = document.getElementById('dep-cmd-deploy');
+  const a = document.getElementById('dep-cmd-all');
+  if (b) b.value = buildCmd;
+  if (d) d.value = deployCmd;
+  if (a) a.value = allCmd;
+}
+
+/* ── HANDOFF ── */
+function openHandoffModal() { doHandoff(); }
+
+function doHandoff() {
+  // Auto-generate everything from session — no form needed
+
+  // Extract last 10 user messages as summary
+  const userMsgs = history.filter(m => m.role === 'user').slice(-10);
+  const summary  = userMsgs.length
+    ? userMsgs.map((m,i) => `${i+1}. ${m.content.replace(/<context_code>[\s\S]*?<\/context_code>\n\n/,'').slice(0,120)}`).join('\n')
+    : '(no messages this session)';
+
+  // Last AI message as status
+  const lastAI  = [...history].reverse().find(m => m.role === 'assistant');
+  const status  = lastAI ? lastAI.content.slice(0, 400) + (lastAI.content.length > 400 ? '…' : '') : '(none)';
+
+  // Current context tabs as next steps hint
+  const ctxSummary = tabs.filter(t => t.content.trim()).map(t => t.name).join(', ');
+  const next = ctxSummary ? `Files in context when session ended: ${ctxSummary}` : 'Check chat log above for last task.';
+
+  const pres = document.querySelectorAll('#chat pre');
+  let codeSection = '';
+  pres.forEach((pre,i) => {
+    const code = pre.querySelector('code')?.innerText||'';
+    codeSection += `\n### Block ${i+1}\n\`\`\`\n${code}\n\`\`\`\n`;
+  });
+
+  const msgs = document.querySelectorAll('.msg-wrap');
+  let chatLog = '';
+  msgs.forEach(m => {
+    const role = m.classList.contains('user')?'USER':'AI';
+    const text = m.querySelector('.bubble')?.innerText?.trim()||'';
+    chatLog += `\n**${role}:** ${text.slice(0,400)}${text.length>400?'…':''}\n`;
+  });
+
+  const now = new Date().toISOString().replace('T',' ').slice(0,19);
+  const md = `# LeadNest — MyAI Handoff
+_Generated: ${now}_
+
+---
+
+## Project
+- **App:** LeadNest (CRM / Lead Management)
+- **Repo:** ${CONFIG.github.owner}/${CONFIG.github.repo} · branch: ${CONFIG.github.branch}
+- **Deploy:** Cloud Run · service: ${CONFIG.gcp.service} · region: ${CONFIG.gcp.region} · project: ${CONFIG.gcp.project}
+- **AI:** aicredits.in (Haiku + Sonnet)
+
+---
+
+## Session Summary
+${summary}
+
+---
+
+## Current Status / Blockers
+${status}
+
+---
+
+## Next Steps
+${next}
+
+---
+
+## Token Usage
+- Total tokens: ${totalToks.toLocaleString()}
+- Estimated cost: ~$${totalCost.toFixed(4)}
+- Model: ${model}
+
+---
+
+## CONFIG (copy into new myai.html)
+\`\`\`javascript
+const CONFIG = {
+  apiKey:  "${CONFIG.apiKey}",
+  baseUrl: "${CONFIG.baseUrl}",
+  models: { haiku: "${CONFIG.models.haiku}", sonnet: "${CONFIG.models.sonnet}" },
+  github: { token: "${CONFIG.github.token}", owner: "${CONFIG.github.owner}", repo: "${CONFIG.github.repo}", branch: "${CONFIG.github.branch}" },
+  gcp: { project: "${CONFIG.gcp.project}", service: "${CONFIG.gcp.service}", region: "${CONFIG.gcp.region}", registry: "${CONFIG.gcp.registry}" }
+};
+\`\`\`
+
+---
+
+## Code This Session
+${codeSection||'_None._'}
+
+---
+
+## Chat Log
+${chatLog||'_Empty._'}
+
+---
+_MyAI · Personal Dev Tool_
+`;
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([md],{type:'text/markdown'}));
+  a.download = `leadnest-handoff-${now.replace(/[: ]/g,'-')}.md`;
+  a.click();
+  appendMsg('sys', `✓ Handoff downloaded · ${totalToks.toLocaleString()} tokens · ~$${totalCost.toFixed(4)}`);
+}
+
+/* ── MODAL HELPERS ── */
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+});
+function setStatus(elId, type, msg) {
+  const el = document.getElementById(elId);
+  el.className = 'status-msg'+(type?' '+type:'');
+  el.textContent = msg;
+  if (!type) el.style.display='none';
+}
+
+
+/* ── FILE TREE ── */
+let sidebarOpen = true;
+
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
+  document.getElementById('sidebar-toggle').textContent = sidebarOpen ? '◀ files' : '▶ files';
+}
+
+async function loadFileTree(path='') {
+  const { token, owner, repo, branch } = CONFIG.github;
+  const label = document.getElementById('sidebar-repo-label');
+  label.textContent = `📁 ${repo}`;
+  const treeEl = document.getElementById('file-tree');
+  treeEl.innerHTML = '<div style="padding:10px;font-family:var(--font-code);font-size:11px;color:var(--muted)">Loading...</div>';
+  try {
+    const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+    const res = await fetch(url, {
+      headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    renderTree(treeEl, data.tree);
+  } catch(e) {
+    treeEl.innerHTML = `<div style="padding:10px;font-family:var(--font-code);font-size:11px;color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+function renderTree(container, items) {
+  // build nested structure
+  const root = {};
+  items.forEach(item => {
+    const parts = item.path.split('/');
+    let node = root;
+    parts.forEach((part, i) => {
+      if (!node[part]) node[part] = { __meta: { type: i===parts.length-1 ? item.type : 'tree', path: item.path, sha: item.sha } };
+      node = node[part];
+    });
+  });
+  container.innerHTML = '';
+  renderNode(container, root, 0);
+}
+
+function renderNode(container, node, depth) {
+  const entries = Object.entries(node).filter(([k])=>k!=='__meta');
+  // folders first, then files
+  const folders = entries.filter(([,v])=>v.__meta?.type==='tree');
+  const files   = entries.filter(([,v])=>v.__meta?.type==='blob');
+  [...folders, ...files].forEach(([name, child]) => {
+    const isFolder = child.__meta?.type === 'tree';
+    const div = document.createElement('div');
+    div.className = 'tree-item' + (isFolder?' folder':'');
+    div.style.paddingLeft = (10 + depth*12) + 'px';
+    div.innerHTML = `<span class="icon">${isFolder?'📂':'📄'}</span><span>${name}</span>`;
+    if (isFolder) {
+      const childContainer = document.createElement('div');
+      childContainer.className = 'tree-children';
+      childContainer.style.display = 'none';
+      // left click = expand/collapse
+      div.onclick = (e) => {
+        e.stopPropagation();
+        const open = childContainer.style.display !== 'none';
+        childContainer.style.display = open ? 'none' : 'block';
+      };
+      // add load-folder button
+      const loadFolderBtn = document.createElement('button');
+      loadFolderBtn.textContent = '⬇';
+      loadFolderBtn.title = 'Load all files in this folder into context';
+      loadFolderBtn.style.cssText = 'margin-left:auto;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 4px;flex-shrink:0;';
+      loadFolderBtn.onmouseover = () => loadFolderBtn.style.color = 'var(--accent)';
+      loadFolderBtn.onmouseout  = () => loadFolderBtn.style.color = 'var(--muted)';
+      loadFolderBtn.onclick = (e) => { e.stopPropagation(); loadFolder(child.__meta.path); };
+      div.appendChild(loadFolderBtn);
+      container.appendChild(div);
+      renderNode(childContainer, child, depth+1);
+      container.appendChild(childContainer);
+    } else {
+      div.onclick = () => loadFileContent(child.__meta.path, div);
+      container.appendChild(div);
+    }
+  });
+}
+
+
+async function loadFolder(folderPath) {
+  const { token, owner, repo, branch } = CONFIG.github;
+  const label = folderPath ? `📂 ${folderPath}` : `📦 entire repo`;
+  appendMsg('sys', `⏳ Loading ${label}...`);
+
+  // skip these always
+  const SKIP_EXT = new Set(['png','jpg','jpeg','gif','svg','ico','woff','woff2','ttf','eot','map','lock','zip','gz']);
+  const SKIP_FILES = new Set(['package-lock.json','yarn.lock','pnpm-lock.yaml','.gitignore','.dockerignore']);
+  const MAX_SIZE = 80000; // skip files > 80KB
+  const MAX_FILES = 40;   // cap total files loaded
+
+  try {
+    // get full tree
+    const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, {
+      headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (!treeRes.ok) throw new Error(await treeRes.text());
+    const treeData = await treeRes.json();
+
+    // filter to blobs inside target folder
+    let files = treeData.tree.filter(item => {
+      if (item.type !== 'blob') return false;
+      if (folderPath && !item.path.startsWith(folderPath + '/')) return false;
+      const ext = item.path.split('.').pop().toLowerCase();
+      const name = item.path.split('/').pop();
+      if (SKIP_EXT.has(ext)) return false;
+      if (SKIP_FILES.has(name)) return false;
+      if (item.size > MAX_SIZE) return false;
+      return true;
+    }).slice(0, MAX_FILES);
+
+    if (!files.length) {
+      appendMsg('sys', `✗ No readable files found in ${label}`);
+      return;
+    }
+
+    // fetch all in parallel
+    const results = await Promise.all(files.map(async item => {
+      try {
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${item.path}?ref=${branch}`, {
+          headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+        return { path: item.path, content };
+      } catch(e) { return null; }
+    }));
+
+    const loaded = results.filter(Boolean);
+    const combined = loaded.map(f => `// ════ FILE: ${f.path} ════\n${f.content}`).join('\n\n');
+    document.getElementById('context-input').value = combined;
+
+    appendMsg('sys', `✓ Loaded ${loaded.length} files from ${label} into context (${Math.round(combined.length/1000)}KB)`);
+  } catch(e) {
+    appendMsg('sys', `✗ Failed to load ${label}: ${e.message}`);
+  }
+}
+
+async function loadFileContent(path, el) {
+  const { token, owner, repo, branch } = CONFIG.github;
+  document.querySelectorAll('.tree-item.active').forEach(e=>e.classList.remove('active'));
+  el.classList.add('active');
+  el.querySelector('span:last-child').textContent += ' ⏳';
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`, {
+      headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const content = decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+    document.getElementById('context-input').value = `// FILE: ${path}\n${content}`;
+    document.getElementById('git-filepath').value = path;
+    el.querySelector('span:last-child').textContent = el.querySelector('span:last-child').textContent.replace(' ⏳','');
+    appendMsg('sys', `✓ Loaded: \`${path}\` into context`);
+  } catch(e) {
+    el.querySelector('span:last-child').textContent = el.querySelector('span:last-child').textContent.replace(' ⏳','');
+    appendMsg('sys', `✗ Could not load ${path}: ${e.message}`);
+  }
+}
+
+// Auto-load tree on startup
+window.addEventListener('DOMContentLoaded', () => {
+  loadFileTree();
+});
+
+/* ── init deploy inputs ── */
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('dep-tag')?.addEventListener('input', buildDeployCmd);
+});
+</script>
+</body>
+</html>
