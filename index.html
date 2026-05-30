@@ -755,7 +755,21 @@ function openGitModal() {
   document.getElementById('git-repo-display').value = `${CONFIG.github.owner}/${CONFIG.github.repo}`;
   document.getElementById('git-branch').value = CONFIG.github.branch;
   const blocks = document.querySelectorAll('#chat pre code');
-  if (blocks.length) document.getElementById('git-content').value = blocks[blocks.length-1].innerText;
+  if (blocks.length) {
+    const code = blocks[blocks.length-1].innerText;
+    document.getElementById('git-content').value = code;
+    const firstLine = code.split('\n')[0];
+    const pathMatch = firstLine.match(/\/\/\s*PATH:\s*(.+)/);
+    if (pathMatch) {
+      const autoPath = pathMatch[1].trim();
+      document.getElementById('git-filepath').value = autoPath;
+      document.getElementById('git-commitmsg').value = `fix: update ${autoPath.split('/').pop()}`;
+      setStatus('git-status','','');
+      openModal('git-modal');
+      doPush();
+      return;
+    }
+  }
   setStatus('git-status','','');
   openModal('git-modal');
 }
@@ -768,10 +782,18 @@ function prefillPush(preId, lang) {
   const extMap={javascript:'js',typescript:'ts',python:'py',jsx:'jsx',tsx:'tsx',css:'css',html:'html',json:'json',yaml:'yml',dockerfile:'Dockerfile'};
   const ext = extMap[lang.toLowerCase()]||lang;
   const autoPath = pathMatch ? pathMatch[1].trim() : (ext==='Dockerfile'?'Dockerfile':`src/file.${ext}`);
+  
+  document.getElementById('git-repo-display').value = `${CONFIG.github.owner}/${CONFIG.github.repo}`;
+  document.getElementById('git-branch').value = CONFIG.github.branch;
   document.getElementById('git-content').value = code;
   document.getElementById('git-filepath').value = autoPath;
   document.getElementById('git-commitmsg').value = pathMatch ? `fix: update ${autoPath.split('/').pop()}` : '';
-  openGitModal();
+  
+  setStatus('git-status','','');
+  openModal('git-modal');
+  if (pathMatch) {
+    doPush();
+  }
 }
 
 async function doPush() {
