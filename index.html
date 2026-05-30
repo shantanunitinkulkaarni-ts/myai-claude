@@ -313,11 +313,31 @@ const CONFIG = {
     sonnet: "claude-sonnet-4-5",
     qwen:   "qwen/qwen3-coder-30b-a3b-instruct"
   },
-  systemPrompt: `You are a senior full-stack engineer working on LeadNest — a lead management and CRM application deployed on Google Cloud Run. You help build features, fix bugs, refactor code, write tests, and plan deployments. Always write production-quality code. Use code blocks with correct language tags. When asked to modify files, show the complete updated file content. Be concise. Prefer working code over long explanations.`,
+  systemPrompt: `You are the dedicated senior full-stack developer for LeadNest — a B2B CRM and lead management SaaS being built and sold to businesses.
+
+Your owner is NOT a developer. He is a businessman with a vision. Your job is to be his in-house developer — building, fixing, and improving LeadNest until it is complete, polished, and production-ready.
+
+TECH STACK:
+- Frontend: Next.js 14 (App Router), TypeScript, Tailwind CSS
+- Backend: Next.js API routes
+- Database: Supabase (PostgreSQL)
+- Auth: Supabase Auth
+- Deployment: Google Cloud Run (service: leadnest, region: asia-south1, project: gen-lang-client-0794202345)
+- Repo: github.com/shantanunitinkulkaarni-ts/claude-leadnest
+
+RULES YOU MUST ALWAYS FOLLOW:
+1. Always respond with COMPLETE file contents — never partial code or snippets.
+2. On the VERY FIRST LINE of every code block, add a comment with the full file path: // PATH: src/components/Overview.tsx
+3. After fixing something, explain what was wrong in ONE plain English sentence (no jargon).
+4. Always end your response with: ✅ Push the fix above, then check [specific thing] in your LeadNest app.
+5. If you need a file that is not in the context, say exactly: Please load [exact/file/path.tsx] from the sidebar, then ask me again.
+6. Write production-quality code. No TODOs, no placeholders, no commented-out code.
+7. Consider the full data flow for every fix: UI component → API route → Supabase query → response back to UI.
+8. When you see GCP error logs, identify the root cause and fix it completely — do not just suppress the error.`,
   github: {
     token:  window.__ENV?.GITHUB_TOKEN || "",
     owner:  "shantanunitinkulkaarni-ts",
-    repo:   "myai",
+    repo:   "claude-leadnest",
     branch: "main"
   },
   gcp: {
@@ -336,7 +356,8 @@ const CONFIG = {
   <button class="model-btn"        id="btn-sonnet" onclick="setModel('sonnet')">Sonnet</button>
   <button class="model-btn"        id="btn-qwen"   onclick="setModel('qwen')">Qwen3</button>
   <div class="sep"></div>
-  <button class="top-btn green" onclick="openGitModal()">⬆ Git Push</button>
+  <button class="top-btn green" onclick="openGitModal()">⬆ Push Fix</button>
+  <button class="top-btn" style="color:#ff5f5f;border-color:#ff5f5f" onclick="fetchGCPLogs()">🔴 Fetch Errors</button>
   <button class="top-btn blue"  onclick="openDeployModal()">🚀 Deploy GCP</button>
   <button class="top-btn"       onclick="openHandoffModal()">📋 Handoff</button>
   <div class="sep"></div>
@@ -362,17 +383,17 @@ const CONFIG = {
 <!-- CHAT -->
 <div id="chat">
   <div id="welcome">
-    <h1>⚡ MyAI — LeadNest</h1>
-    <p class="sub">aicredits.in · Haiku · Sonnet · Qwen3 Coder · No limits, just your credits</p>
+    <h1>⚡ MyAI — LeadNest Dev</h1>
+    <p class="sub">Your AI in-house developer · Loading LeadNest codebase...</p>
     <div class="pills">
-      <div class="pill" onclick="quickPrompt('Add a new feature to LeadNest: ')">Add feature</div>
-      <div class="pill" onclick="quickPrompt('Fix this bug: ')">Fix bug</div>
-      <div class="pill" onclick="quickPrompt('Write unit tests for the code in context')">Write tests</div>
-      <div class="pill" onclick="quickPrompt('Refactor the code in context for production quality')">Refactor</div>
-      <div class="pill" onclick="quickPrompt('Review this code and suggest improvements')">Code review</div>
-      <div class="pill" onclick="quickPrompt('Write a Dockerfile for LeadNest optimised for Cloud Run')">Dockerfile</div>
-      <div class="pill" onclick="quickPrompt('Create a new API endpoint for: ')">New endpoint</div>
-      <div class="pill" onclick="quickPrompt('Debug this error: ')">Debug error</div>
+      <div class="pill" onclick="quickPrompt('Give me a full overview of the current state of LeadNest. What is built, what is working, and what needs to be done?')">📊 Project Status</div>
+      <div class="pill" onclick="quickPrompt('This feature is broken: ')">🐛 Fix a Bug</div>
+      <div class="pill" onclick="quickPrompt('Add this new feature to LeadNest: ')">✨ Add Feature</div>
+      <div class="pill" onclick="quickPrompt('Review the entire codebase and suggest the top 5 improvements for production readiness.')">🔍 Code Review</div>
+      <div class="pill" onclick="quickPrompt('The overview tab is not loading data correctly. Diagnose and fix it.')">📋 Fix Overview Tab</div>
+      <div class="pill" onclick="fetchGCPLogs()">🔴 Fetch Live Errors</div>
+      <div class="pill" onclick="quickPrompt('What Supabase tables and columns does LeadNest use? Give me a full schema overview.')">🗄️ DB Schema</div>
+      <div class="pill" onclick="quickPrompt('Prepare LeadNest for production: check auth, error handling, loading states, and empty states.')">🚀 Production Check</div>
     </div>
   </div>
 </div>
@@ -741,10 +762,15 @@ function openGitModal() {
 
 function prefillPush(preId, lang) {
   const code = document.getElementById(preId).querySelector('code').innerText;
+  // Auto-detect file path from first line comment: // PATH: src/components/Foo.tsx
+  const firstLine = code.split('\n')[0];
+  const pathMatch = firstLine.match(/\/\/\s*PATH:\s*(.+)/);
   const extMap={javascript:'js',typescript:'ts',python:'py',jsx:'jsx',tsx:'tsx',css:'css',html:'html',json:'json',yaml:'yml',dockerfile:'Dockerfile'};
   const ext = extMap[lang.toLowerCase()]||lang;
+  const autoPath = pathMatch ? pathMatch[1].trim() : (ext==='Dockerfile'?'Dockerfile':`src/file.${ext}`);
   document.getElementById('git-content').value = code;
-  document.getElementById('git-filepath').value = ext==='Dockerfile'?'Dockerfile':`src/file.${ext}`;
+  document.getElementById('git-filepath').value = autoPath;
+  document.getElementById('git-commitmsg').value = pathMatch ? `fix: update ${autoPath.split('/').pop()}` : '';
   openGitModal();
 }
 
@@ -1096,10 +1122,46 @@ async function loadFileContent(path, el) {
   }
 }
 
-// Auto-load tree on startup
+// Auto-load tree on startup, then auto-load full repo into context
 window.addEventListener('DOMContentLoaded', () => {
   loadFileTree();
+  // Auto-load entire LeadNest repo into context after tree loads
+  setTimeout(() => {
+    appendMsg('sys', '⏳ Auto-loading LeadNest codebase into context...');
+    loadFolder('').then(() => {
+      document.getElementById('welcome') && (document.getElementById('welcome').querySelector('.sub').textContent = 'LeadNest codebase loaded ✅ — Ready for your instructions.');
+    });
+  }, 1500);
 });
+
+/* ── GCP LOGS ── */
+async function fetchGCPLogs() {
+  appendMsg('sys', '⏳ Fetching live errors from LeadNest on GCP...');
+  try {
+    const res = await fetch('/gcp-logs');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const entries = data.entries || [];
+    if (!entries.length) {
+      appendMsg('sys', '✅ No errors found in LeadNest logs in the last hour. App looks healthy!');
+      return;
+    }
+    // Format logs into readable text
+    const logText = entries.map(e => {
+      const ts = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '';
+      const msg = e.textPayload || e.jsonPayload?.message || JSON.stringify(e.jsonPayload) || '(no message)';
+      const sev = e.severity || 'INFO';
+      return `[${ts}] ${sev}: ${msg}`;
+    }).join('\n');
+    const userMsg = `Here are the latest errors from your live LeadNest app:\n\`\`\`\n${logText}\n\`\`\`\nPlease diagnose the root cause and fix the relevant file.`;
+    // Inject into chat and send to AI automatically
+    document.getElementById('user-input').value = userMsg;
+    appendMsg('sys', `✅ Fetched ${entries.length} log entries. Sending to AI for analysis...`);
+    setTimeout(() => sendMessage(), 500);
+  } catch(e) {
+    appendMsg('sys', `✗ Could not fetch GCP logs: ${e.message}. Make sure the MyAI server has GCP log access.`);
+  }
+}
 
 /* ── init deploy inputs ── */
 window.addEventListener('DOMContentLoaded', () => {

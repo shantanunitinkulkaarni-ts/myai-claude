@@ -1,10 +1,31 @@
 const express = require("express");
 const https   = require("https");
+const http    = require("http");
 const path    = require("path");
 const fs      = require("fs");
 const app     = express();
 const PORT    = process.env.PORT || 8080;
 const TARGET  = "api.aicredits.in";
+const GCP_PROJECT = process.env.GCP_PROJECT || "gen-lang-client-0794202345";
+
+// Helper: get GCP access token from metadata server (works on Cloud Run)
+async function getGCPToken() {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: "metadata.google.internal",
+      path: "/computeMetadata/v1/instance/service-accounts/default/token",
+      headers: { "Metadata-Flavor": "Google" }
+    };
+    http.get(options, res => {
+      let body = "";
+      res.on("data", c => body += c);
+      res.on("end", () => {
+        try { resolve(JSON.parse(body).access_token); }
+        catch(e) { reject(new Error("Could not parse token: " + body)); }
+      });
+    }).on("error", reject);
+  });
+}
 
 // Inject env vars into HTML at runtime — no secrets in code
 app.get("/", (req, res) => {
@@ -15,12 +36,57 @@ app.get("/", (req, res) => {
     GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
     GCP_PROJECT:  process.env.GCP_PROJECT  || "gen-lang-client-0794202345",
   };
-  // inject before </head>
   html = html.replace(
     "<script>",
     `<script>window.__ENV = ${JSON.stringify(env)};</script>\n<script>`,
   );
   res.send(html);
+});
+
+// GCP Logs endpoint — fetches latest errors from LeadNest Cloud Run
+app.get("/gcp-logs", async (req, res) => {
+  try {
+    const token = await getGCPToken();
+    const filter = [
+      `resource.type="cloud_run_revision"`,
+      `resource.labels.service_name="leadnest"`,
+      `severity>=WARNING`,
+      `timestamp>="${new Date(Date.now() - 3600000).toISOString()}"` // last 1 hour
+    ].join(" ");
+
+    const body = JSON.stringify({
+      resourceNames: [`projects/${GCP_PROJECT}`],
+      filter,
+      orderBy: "timestamp desc",
+      pageSize: 30
+    });
+
+    const options = {
+      hostname: "logging.googleapis.com",
+      path: "/v2/entries:list",
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body)
+      }
+    };
+
+    const logsReq = https.request(options, logsRes => {
+      let data = "";
+      logsRes.on("data", c => data += c);
+      logsRes.on("end", () => {
+        try { res.json(JSON.parse(data)); }
+        catch(e) { res.status(500).json({ error: "Invalid response from GCP Logging", raw: data.slice(0, 500) }); }
+      });
+    });
+    logsReq.on("error", e => res.status(500).json({ error: e.message }));
+    logsReq.write(body);
+    logsReq.end();
+
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Proxy /v1/* to aicredits.in server-side — no CORS
