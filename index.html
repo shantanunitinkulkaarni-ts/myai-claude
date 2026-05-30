@@ -737,8 +737,15 @@ async function sendMessage() {
 
     document.getElementById('thinking')?.remove();
     history.push({ role:'assistant', content:reply });
-  saveState();
+    saveState();
     appendMsg('ai', reply);
+  
+    // Auto-trigger push if the reply contains a code block with a PATH
+    if (reply.match(/```(\w*)\n?\/\/\s*PATH:\s*(.+)/)) {
+      setTimeout(() => {
+        openGitModal();
+      }, 1000);
+    }
 
   } catch(e) {
     document.getElementById('thinking')?.remove();
